@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panda Rolluiken — Factuur / 发票系统</title>
+<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F97316'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>P</text></svg>">
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ 侧边栏 ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">P</div>
+      <div class="brand-text">
+        <strong>PANDA Rolluiken</strong>
+        <span data-i18n="app_slogan">发票系统</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-view="invoice" data-i18n="nav_new">新建发票</button>
+      <button class="nav-btn" data-view="records" data-i18n="nav_records">发票记录</button>
+      <button class="nav-btn" data-view="customers" data-i18n="nav_customers">客户管理</button>
+      <button class="nav-btn" data-view="settings" data-i18n="nav_settings">设置</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="zh">中文</button>
+        <button class="lang-btn active" data-lang="nl">Nederlands</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ 主内容 ============ -->
+  <main class="main">
+
+    <!-- 新建发票视图 -->
+    <section class="view active" id="view-invoice">
+      <div class="view-head">
+        <h1 data-i18n="nav_new">新建发票</h1>
+        <div class="head-actions">
+          <select id="invoice-currency" class="select">
+            <option value="SRD">SRD</option>
+          </select>
+          <button class="btn btn-ghost" id="btn-clear" data-i18n="btn_clear">清空</button>
+        </div>
+      </div>
+
+      <!-- 发票基本信息 -->
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="sec_invoice_info">发票信息</span></div>
+        <div class="grid grid-4">
+          <div class="field">
+            <label data-i18n="lbl_inv_no">发票编号</label>
+            <input type="text" id="inv-number" placeholder="INV-2026-0001">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_date">开票日期</label>
+            <input type="date" id="inv-date">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_due">有效期至</label>
+            <input type="date" id="inv-due">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_payment">付款条款</label>
+            <select id="inv-payment" class="select">
+              <option value="50/50" data-i18n="pay_5050">定金50% + 安装后50%</option>
+              <option value="100" data-i18n="pay_100">全款预付</option>
+              <option value="0/100" data-i18n="pay_0">安装完成后全款</option>
+            </select>
+          </div>
+        </div>
+        <!-- 收款记录 -->
+        <div class="received-row">
+          <div class="received-block">
+            <label data-i18n="lbl_received_deposit">定金实收</label>
+            <div class="received-inputs">
+              <span class="due-hint" id="due-deposit" data-due-hint="1">Verschuldigd SRD 0</span>
+              <input type="number" id="inv-received-deposit" min="0" step="0.01" value="0" placeholder="0">
+              <button class="btn btn-small btn-ghost" id="btn-deposit-full" data-i18n="btn_received_full">全收</button>
+            </div>
+            <input type="date" id="inv-deposit-date" data-i18n-ph="ph_deposit_date" title="定金收款日期">
+          </div>
+          <div class="received-block">
+            <label data-i18n="lbl_received_balance">尾款实收</label>
+            <div class="received-inputs">
+              <span class="due-hint" id="due-balance" data-due-hint="1">Verschuldigd SRD 0</span>
+              <input type="number" id="inv-received-balance" min="0" step="0.01" value="0" placeholder="0">
+              <button class="btn btn-small btn-ghost" id="btn-balance-full" data-i18n="btn_received_full">全收</button>
+            </div>
+            <input type="date" id="inv-balance-date" data-i18n-ph="ph_balance_date" title="尾款收款日期">
+          </div>
+        </div>
+      </div>
+
+      <!-- 客户信息 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="sec_customer">客户信息</span>
+          <button class="btn btn-small btn-ghost" id="btn-customer-pick" data-i18n="btn_pick_customer">选择已有客户</button>
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label data-i18n="lbl_cust_name">客户姓名</label>
+            <input type="text" id="cust-name" placeholder="">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_phone">电话</label>
+            <input type="text" id="cust-phone" placeholder="+597">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_address">地址</label>
+            <input type="text" id="cust-address" placeholder="">
+          </div>
+        </div>
+      </div>
+
+      <!-- 门信息 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="sec_doors">门信息（卷帘门）</span>
+          <button class="btn btn-small btn-primary" id="btn-add-door" data-i18n="btn_add_door">+ 添加门</button>
+        </div>
+        <div id="door-list"></div>
+      </div>
+
+      <!-- 其他费用 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="sec_other_items">其他费用</span>
+          <button class="btn btn-small btn-primary" id="btn-add-other" data-i18n="btn_add_other">+ 添加项目</button>
+        </div>
+        <table class="table" id="other-table">
+          <thead>
+            <tr>
+              <th style="width:30%"><span data-i18n="th_item">品名</span></th>
+              <th style="width:30%"><span data-i18n="th_name_nl">荷兰文品名</span></th>
+              <th style="width:22%"><span data-i18n="th_unit_price">价格</span></th>
+              <th style="width:18%"><span data-i18n="th_amount">金额</span></th>
+              <th style="width:8%"></th>
+            </tr>
+          </thead>
+          <tbody id="other-body"></tbody>
+        </table>
+      </div>
+
+      <!-- 汇总 -->
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="sec_summary">费用汇总</span></div>
+        <div class="summary-grid">
+          <div class="summary-row">
+            <span data-i18n="sum_doors">门体合计</span>
+            <span id="sum-doors" class="mono">$0.00</span>
+          </div>
+          <div class="summary-row">
+            <span data-i18n="sum_other">其他费用合计</span>
+            <span id="sum-other" class="mono">$0.00</span>
+          </div>
+          <div class="summary-row">
+            <label class="inline-label"><span data-i18n="lbl_discount">客户优惠</span>
+              <input type="number" id="inv-discount" min="0" step="0.01" value="0" class="input-inline">
+            </label>
+            <span id="sum-discount" class="mono">-$0.00</span>
+          </div>
+          <div class="summary-row total">
+            <span data-i18n="sum_total">总价</span>
+            <span id="sum-total" class="mono big">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 备注 -->
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="lbl_notes">备注</span></div>
+        <textarea id="inv-notes" rows="3" placeholder=""></textarea>
+      </div>
+
+      <!-- 底部操作 -->
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="btn-save" data-i18n="btn_save_invoice">保存发票</button>
+        <button class="btn btn-print btn-lg" id="btn-print" data-i18n="btn_print">打印 / PDF</button>
+      </div>
+    </section>
+
+    <!-- 发票记录视图 -->
+    <section class="view" id="view-records">
+      <div class="view-head">
+        <h1 data-i18n="nav_records">发票记录</h1>
+        <div class="filter-row">
+          <select id="record-year" class="select filter-select">
+            <option value="all" data-i18n="all_years">全部年份</option>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+          <select id="record-month" class="select filter-select" data-month-select="1">
+            <option value="all" data-i18n="all_months">全部月份</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+          <div class="search-box">
+            <input type="text" id="record-search" data-i18n-ph="ph_search_records" placeholder="搜索客户 / 编号 / 金额">
+          </div>
+        </div>
+      </div>
+      <!-- 月度收入统计 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="sec_monthly_stats">月度收入统计</span>
+          <span class="stat-hint" id="stat-period"></span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-num" id="stat-total">0</div>
+            <div class="stat-label" data-i18n="stat_total">发票总金额</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num accent" id="stat-deposit">0</div>
+            <div class="stat-label" data-i18n="stat_deposit">定金合计</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="stat-balance">0</div>
+            <div class="stat-label" data-i18n="stat_balance">尾款合计</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num dim" id="stat-count">0</div>
+            <div class="stat-label" data-i18n="stat_count">发票数量</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th data-i18n="th_inv_no">编号</th>
+                <th data-i18n="th_customer">客户</th>
+                <th data-i18n="th_date">日期</th>
+                <th data-i18n="th_total">总价</th>
+                <th data-i18n="th_status">状态</th>
+                <th data-i18n="th_actions">操作</th>
+              </tr>
+            </thead>
+            <tbody id="record-body"></tbody>
+          </table>
+          <div class="empty" id="record-empty" data-i18n="no_records">暂无发票记录</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 客户管理视图 -->
+    <section class="view" id="view-customers">
+      <div class="view-head">
+        <h1 data-i18n="nav_customers">客户管理</h1>
+        <div class="head-actions">
+          <select id="cust-year" class="select filter-select">
+            <option value="all" data-i18n="all_years">全部年份</option>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+          <select id="cust-month" class="select filter-select" data-month-select="1">
+            <option value="all" data-i18n="all_months">全部月份</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+          <button class="btn btn-primary" id="btn-add-customer" data-i18n="btn_new_customer">+ 新客户</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="search-box mb">
+          <input type="text" id="customer-search" data-i18n-ph="ph_search_customer" placeholder="搜索客户">
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th data-i18n="th_customer">客户</th>
+                <th data-i18n="th_phone">电话</th>
+                <th data-i18n="th_address">地址</th>
+                <th data-i18n="th_inv_count">发票数</th>
+                <th data-i18n="th_deposit">定金(实收/应缴)</th>
+                <th data-i18n="th_balance">尾款(实收/应缴)</th>
+                <th data-i18n="th_remain">剩余</th>
+                <th data-i18n="th_actions">操作</th>
+              </tr>
+            </thead>
+            <tbody id="customer-body"></tbody>
+          </table>
+          <div class="empty" id="customer-empty" data-i18n="no_customers">暂无客户</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 设置视图 -->
+    <section class="view" id="view-settings">
+      <div class="view-head">
+        <h1 data-i18n="nav_settings">设置</h1>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="sec_company">公司信息（显示在发票抬头）</span></div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label data-i18n="lbl_company_name">公司名称</label>
+            <input type="text" id="set-company-name">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_tag">标语</label>
+            <input type="text" id="set-company-tag">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_address">地址</label>
+            <input type="text" id="set-company-address">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_phone">电话</label>
+            <input type="text" id="set-company-phone">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_email">邮箱</label>
+            <input type="text" id="set-company-email">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_web">网站</label>
+            <input type="text" id="set-company-web">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_tax">税号 (BTW)</label>
+            <input type="text" id="set-company-tax">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_kvk">KVK 商会号</label>
+            <input type="text" id="set-company-kvk">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_bank">银行账户</label>
+            <input type="text" id="set-company-bank">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_company_bank_holder">账户名 (Holder)</label>
+            <input type="text" id="set-company-bank-holder">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="sec_numbering">发票编号规则</span></div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label data-i18n="lbl_prefix">前缀</label>
+            <input type="text" id="set-inv-prefix" value="INV-">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_next_no">下一个编号</label>
+            <input type="number" id="set-inv-next" min="1">
+          </div>
+          <div class="field">
+            <label data-i18n="lbl_lang">界面语言</label>
+            <select id="set-lang" class="select">
+              <option value="nl" data-i18n="lang_nl">Nederlands（荷兰文）</option>
+              <option value="zh" data-i18n="lang_zh">中文</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title" data-i18n="sec_data">数据管理</span></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-export" data-i18n="btn_export">导出备份 (JSON)</button>
+          <button class="btn btn-ghost" id="btn-import" data-i18n="btn_import">导入数据</button>
+          <input type="file" id="import-file" accept=".json" hidden>
+        </div>
+        <p class="hint" data-i18n="hint_data">数据保存在本浏览器中。建议定期导出备份。</p>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="btn-save-settings" data-i18n="btn_save_settings">保存设置</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============ 选择客户弹窗 ============ -->
+<div class="modal-overlay" id="modal-customer">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 data-i18n="title_pick_customer">选择客户</h3>
+      <button class="modal-close" data-close="modal-customer">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="search-box mb">
+        <input type="text" id="modal-customer-search" data-i18n-ph="ph_search_customer" placeholder="搜索客户">
+      </div>
+      <div class="modal-list" id="modal-customer-list"></div>
+      <div class="empty" id="modal-customer-empty" data-i18n="no_customers">暂无客户</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 编辑客户弹窗 ============ -->
+<div class="modal-overlay" id="modal-customer-edit">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 data-i18n="title_edit_customer">编辑客户</h3>
+      <button class="modal-close" data-close="modal-customer-edit">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label data-i18n="lbl_cust_name">客户姓名</label><input type="text" id="edit-cust-name"></div>
+      <div class="field"><label data-i18n="lbl_phone">电话</label><input type="text" id="edit-cust-phone"></div>
+      <div class="field"><label data-i18n="lbl_address">地址</label><input type="text" id="edit-cust-address"></div>
+      <div class="btn-row right">
+        <button class="btn btn-danger" id="btn-del-customer" data-i18n="btn_delete">删除</button>
+        <button class="btn btn-primary" id="btn-save-customer" data-i18n="btn_save">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 客户详情弹窗 ============ -->
+<div class="modal-overlay" id="modal-customer-detail">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h3 data-i18n="title_customer_detail">客户详情</h3>
+      <button class="modal-close" data-close="modal-customer-detail">×</button>
+    </div>
+    <div class="modal-body" id="customer-detail-body"></div>
+  </div>
+</div>
+
+<!-- ============ 发票预览弹窗 ============ -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h3 data-i18n="title_view_invoice">发票预览</h3>
+      <div class="head-actions" style="gap:8px">
+        <div class="lang-switch" style="width:auto">
+          <button class="lang-btn view-lang-btn active" data-vlang="zh" onclick="setViewLang('zh')">中文</button>
+          <button class="lang-btn view-lang-btn" data-vlang="nl" onclick="setViewLang('nl')">NL</button>
+        </div>
+        <button class="btn btn-small btn-wa" onclick="shareViewWhatsApp()" data-i18n="btn_share_wa">WhatsApp</button>
+        <button class="btn btn-small btn-mail" onclick="shareViewEmail()" data-i18n="btn_share_email">Email</button>
+        <button class="btn btn-small btn-print" onclick="printViewInvoice()" data-i18n="btn_print">打印 / PDF</button>
+        <button class="modal-close" data-close="modal-view">×</button>
+      </div>
+    </div>
+    <div class="modal-body view-body" id="view-body"></div>
+  </div>
+</div>
+
+<!-- ============ 发票预览/打印 ============ -->
+<div id="print-area"></div>
+
+<script src="js/i18n.js?v=19"></script>
+<script src="js/app.js?v=19"></script>
+</body>
+</html>
