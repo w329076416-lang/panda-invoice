@@ -1544,10 +1544,9 @@ function viewRecord(id) {
   const inv = DB.invoices.find(x => x.id === id);
   if (!inv) return;
   viewingInvoice = inv;
-  viewingLang = 'zh';
+  viewingLang = currentLang;   // 发票语言跟随界面语言（左下角切换）
   renderViewInvoice();
   $('modal-view').classList.add('show');
-  updateViewLangBtns();
 }
 function renderViewInvoice() {
   const body = $('view-body');
@@ -1556,16 +1555,6 @@ function renderViewInvoice() {
   body.innerHTML = buildPrintHTML(invForPrint, false);
   const sheet = body.querySelector('.sheet');
   if (sheet) sheet.style.cssText += ';margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.2);border-radius:6px;';
-}
-function setViewLang(lang) {
-  viewingLang = lang;
-  renderViewInvoice();
-  updateViewLangBtns();
-}
-function updateViewLangBtns() {
-  document.querySelectorAll('.view-lang-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.vlang === viewingLang);
-  });
 }
 function printViewInvoice() {
   if (!viewingInvoice) return;
