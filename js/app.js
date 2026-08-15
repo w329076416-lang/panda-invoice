@@ -1953,7 +1953,46 @@ function toast(msg) {
 }
 
 /* ---------- 初始化 ---------- */
+/* ---------- 登录保护 ---------- */
+const LOGIN_USER = 'panda2026';
+const LOGIN_PASS = 'Panda170810';
+const AUTH_KEY = 'panda_invoice_auth';
+const AUTH_DAYS = 7; // 登录有效期 7 天
+
+function checkAuth() {
+  const mask = $('login-mask');
+  if (!mask) return;
+  try {
+    const saved = localStorage.getItem(AUTH_KEY);
+    if (saved) {
+      const t = JSON.parse(saved);
+      if (t.user === LOGIN_USER && Date.now() - t.at < AUTH_DAYS * 864e5) {
+        mask.classList.add('hidden');
+        return;
+      }
+    }
+  } catch (e) {}
+  mask.classList.remove('hidden');
+  // 聚焦输入框
+  const u = $('login-user');
+  if (u) setTimeout(() => u.focus(), 50);
+}
+
+function doLogin() {
+  const u = ($('login-user').value || '').trim();
+  const p = $('login-pass').value || '';
+  if (u === LOGIN_USER && p === LOGIN_PASS) {
+    localStorage.setItem(AUTH_KEY, JSON.stringify({ user: u, at: Date.now() }));
+    $('login-mask').classList.add('hidden');
+    $('login-err').textContent = '';
+    $('login-pass').value = '';
+  } else {
+    $('login-err').textContent = currentLang === 'nl' ? 'Ongeldige inloggegevens' : '账户名或密码错误';
+  }
+}
+
 function init() {
+  checkAuth();
   loadDB();
   seedDemoData();
   // 从云端拉取数据（若云端更新则覆盖，稍后刷新界面）
@@ -1985,6 +2024,10 @@ function init() {
   $('record-month').value = String(now.getMonth() + 1);
 
   // 事件绑定
+  // 登录
+  $('btn-login').addEventListener('click', doLogin);
+  $('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  $('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.addEventListener('click', () => switchView(b.dataset.view));
   });

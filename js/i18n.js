@@ -2,6 +2,8 @@
 const I18N = {
   zh: {
     app_slogan: '发票系统',
+    login_sub: '发票系统 · Factuur Systeem',
+    login_btn: '登录',
     nav_new: '新建发票',
     nav_records: '发票记录',
     nav_customers: '客户管理',
@@ -166,6 +168,8 @@ const I18N = {
 
   nl: {
     app_slogan: 'Factuursysteem',
+    login_sub: 'Factuur Systeem · 发票系统',
+    login_btn: 'Inloggen',
     nav_new: 'Nieuwe factuur',
     nav_records: 'Facturen',
     nav_customers: 'Klanten',
