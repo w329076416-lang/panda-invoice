@@ -1954,7 +1954,7 @@ function toast(msg) {
 
 /* ---------- 初始化 ---------- */
 /* ---------- 登录保护 ---------- */
-const LOGIN_USER = 'panda2026';
+const LOGIN_USER = 'panda';
 const LOGIN_PASS = 'Panda170810';
 const AUTH_KEY = 'panda_invoice_auth';
 const AUTH_DAYS = 7; // 登录有效期 7 天
