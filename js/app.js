@@ -3,7 +3,7 @@
 
 /* ---------- 存储 ---------- */
 const LS_KEY = 'panda_invoice_data_v1';
-const DATA_VERSION = 18; // 数据结构版本（v11：1-7月真实发票 162 笔，各月总额精确匹配，修门金额有零有整）
+const DATA_VERSION = 19; // 数据结构版本（v11：1-7月真实发票 162 笔，各月总额精确匹配，修门金额有零有整）
 let DB = { invoices: [], customers: [], settings: {}, nextNo: 1 };
 
 const DEFAULT_SETTINGS = {
@@ -56,10 +56,61 @@ function loadDB() {
 }
 function saveDB() {
   localStorage.setItem(LS_KEY, JSON.stringify(DB));
+  cloudPush();   // 同时同步到云端（Supabase）
 }
 function saveSettings(partial) {
   DB.settings = Object.assign({}, DB.settings, partial);
   saveDB();
+}
+
+/* ---------- 云存储同步（Supabase） ---------- */
+const SUPABASE_URL = 'https://kzsoifdsqebasrxsfmrn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Nvl_1Fl27NmXQcTqbTjECw_ZpwTAbmt';
+const CLOUD_ID = 'main';
+function cloudPush() {
+  try {
+    const body = { id: CLOUD_ID, payload: JSON.parse(JSON.stringify(DB)), updated_at: new Date().toISOString() };
+    fetch(SUPABASE_URL + '/rest/v1/app_data', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(body)
+    }).catch(() => {});
+  } catch (e) {}
+}
+async function cloudPull() {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?select=payload,updated_at&id=eq.' + CLOUD_ID + '&limit=1', {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) return false;
+    const rows = await res.json();
+    if (!rows || rows.length === 0) return false;
+    const cloudData = rows[0].payload;
+    if (!cloudData || !cloudData.invoices) return false;
+    const cloudCount = (cloudData.invoices || []).length;
+    const localCount = (DB.invoices || []).length;
+    // 云端数据更新（或本地是空示例）→ 用云端
+    if (cloudCount > 0 && cloudCount >= localCount) {
+      const hadLocal = !!localStorage.getItem(LS_KEY);
+      DB = cloudData;
+      DB.settings = Object.assign({}, DEFAULT_SETTINGS, DB.settings || {});
+      DB.settings.company = Object.assign({}, DEFAULT_SETTINGS.company, (DB.settings.company || {}));
+      DB.invoices = DB.invoices || [];
+      DB.customers = DB.customers || [];
+      DB.version = DATA_VERSION;
+      if (hadLocal) localStorage.setItem(LS_KEY, JSON.stringify(DB));
+      return true;
+    }
+    return false;
+  } catch (e) { return false; }
 }
 
 /* ---------- 客户池（按年份分组，地址来自 Numbers 批注真实配对 + wacli 真实地址） ---------- */
@@ -1905,6 +1956,15 @@ function toast(msg) {
 function init() {
   loadDB();
   seedDemoData();
+  // 从云端拉取数据（若云端更新则覆盖，稍后刷新界面）
+  cloudPull().then(updated => {
+    if (updated) {
+      const s2 = DB.settings;
+      setLang(s2.lang || 'nl');
+      renderRecords(); renderStats(); renderCustomers();
+      if ($('view-records').classList.contains('active')) { renderRecords(); renderStats(); }
+    }
+  });
   const s = DB.settings;
   // 语言（默认荷兰文）
   const lang = s.lang || 'nl';
