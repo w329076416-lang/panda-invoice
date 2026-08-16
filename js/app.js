@@ -1378,9 +1378,11 @@ function buildPrintHTML(inv, isQuote) {
   const cur = 'SRD';
   const L = inv.lang ? I18N[inv.lang] : I18N.zh;
   const base = inv.totals || {};
+  const isZh = inv.lang !== 'nl';
 
-  // 门明细行（手动金额）
+  // 门明细行
   let doorRows = '';
+  let totalQty = 0;
   if (inv.doors && inv.doors.length) {
     inv.doors.forEach((d, i) => {
       const typeTxt = t2('type_' + d.type, inv.lang);
@@ -1388,12 +1390,15 @@ function buildPrintHTML(inv, isQuote) {
       const price = parseFloat(d.price) || 0;
       const qty = parseInt(d.qty) || 1;
       const line = price * qty;
+      totalQty += qty;
       doorRows += `<tr class="item-row">
-        <td><div class="i-name">${qty > 1 ? qty + '× ' : ''}${esc(typeTxt)} · ${esc(colorTxt)}</div>
-        <div class="i-desc">${esc(typeTxt)} ${esc(colorTxt)}</div></td>
+        <td style="text-align:center">${i + 1}</td>
+        <td>${esc(typeTxt)} ${esc(colorTxt)}</td>
+        <td style="text-align:center">${isZh ? '扇' : 'stuk'}</td>
         <td style="text-align:center">${qty}</td>
         <td style="text-align:right">${fmtCur(price, 'SRD')}</td>
         <td style="text-align:right">${fmtCur(line, 'SRD')}</td>
+        <td></td>
       </tr>`;
     });
   }
@@ -1405,131 +1410,86 @@ function buildPrintHTML(inv, isQuote) {
       const name = inv.lang === 'nl' ? (o.name_nl || o.name_zh) : (o.name_zh || o.name_nl);
       if (!name) return;
       const shown = parseFloat(o.price) || 0;
+      totalQty += 1;
       otherRows += `<tr class="item-row">
-        <td><div class="i-name">${esc(name)}</div></td>
+        <td style="text-align:center">${(inv.doors || []).length + (inv.others || []).indexOf(o) + 1}</td>
+        <td>${esc(name)}</td>
+        <td style="text-align:center">${isZh ? '项' : 'item'}</td>
         <td style="text-align:center">1</td>
         <td style="text-align:right">${fmtCur(shown, 'SRD')}</td>
         <td style="text-align:right">${fmtCur(shown, 'SRD')}</td>
+        <td></td>
       </tr>`;
     });
   }
 
-  const payTerm = inv.payment === '100' ? L.term_pay100 : inv.payment === '0/100' ? L.term_pay0 : L.term_deposit;
-  const docTitle = isQuote ? (inv.lang === 'nl' ? 'OFFERTE' : '报价单') : (inv.lang === 'nl' ? 'FACTUUR' : '发票');
-  const docSub = inv.lang === 'nl' ? 'QUOTE / FACTUUR' : '报价单 / 发票';
-
   const doorsUSD = base.doorsUSD || 0;
   const othersUSD = base.othersUSD || 0;
   const discountUSD = base.discountUSD || 0;
-  const totalUSD = base.totalUSD || 0;   // 不含税金额（明细合计）
-  const subtotal = doorsUSD + othersUSD;
-  // 增值税：税率取设置值（默认 10%，可在设置修改）；税额 = 不含税金额 × 税率；总金额 = 不含税 + 税额
+  const totalUSD = base.totalUSD || 0;
   const vatRate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
   const vatPct = Math.round(vatRate * 100);
   const btwAmount = Math.round(totalUSD * vatRate);
-  const totalIncl = totalUSD + btwAmount;   // 含税总金额 = 发票总金额
-  const fxRate = fxForDate(inv.date);
-  const fxLabel = inv.lang === 'nl'
-    ? 'Koers: 1 USD = ' + fxRate.toFixed(2).replace('.', ',') + ' SRD'
-    : '汇率: 1 USD = ' + fxRate.toFixed(2) + ' SRD';
-  const vatLabel = inv.lang === 'nl'
-    ? 'BTW ' + vatPct + '%'
-    : '增值税 BTW ' + vatPct + '%';
-  const vatNote = inv.lang === 'nl'
-    ? 'Totaal = excl. BTW + ' + vatPct + '% BTW'
-    : '总金额 = 不含税 + ' + vatPct + '% 增值税';
+  const totalIncl = totalUSD + btwAmount;
+
+  // 打印日期
+  const printDate = todayStr();
 
   return `
   <div class="sheet" lang="${inv.lang || 'zh'}">
-    <div class="sheet-header">
-      <div>
-        <div class="co-name">${esc(co.name || '')}</div>
-        <div class="co-tag">${esc(inv.lang === 'nl' ? (co.tag_nl || '') : (co.tag_zh || ''))}</div>
-        <div class="co-contact">
-          ${co.address ? esc(co.address) + '<br>' : ''}
-          ${co.phone ? 'T: ' + esc(co.phone) + (co.web ? '  |  W: ' + esc(co.web) : '') : esc(co.web || '')}
-          ${co.email ? '<br>E: ' + esc(co.email) : ''}
-          ${co.tax ? '<br>' + (inv.lang === 'nl' ? 'BTW' : '税号') + ': ' + esc(co.tax) : ''}
-          ${co.kvk ? '<br>KKF: ' + esc(co.kvk) : ''}
-        </div>
-      </div>
-      <div class="inv-title-box">
-        <div class="inv-title">${docTitle}</div>
-        <div class="inv-sub">${docSub}</div>
-        <div class="inv-meta">
-          <b>${inv.lang === 'nl' ? 'Factuurnr' : '编号'}:</b> ${esc(inv.number)}<br>
-          <b>${inv.lang === 'nl' ? 'Datum' : '日期'}:</b> ${esc(inv.date)}<br>
-          <b>${inv.lang === 'nl' ? 'Geldig tot' : '有效期至'}:</b> ${esc(inv.due || '—')}<br>
-          <b>${inv.lang === 'nl' ? 'BTW-tarief' : '税率'}: ${vatPct}%</b><br>          <b>${fxLabel}</b>
-        </div>
-      </div>
+    <!-- 右侧竖排公司名 -->
+    <div class="cn-co-name">
+      <div class="cn-co-zh">${esc(co.name || '')}</div>
+      <div class="cn-co-en">${esc(co.tag_nl || co.tag_zh || '')}</div>
     </div>
-    <div class="sheet-body">
-      <div class="billing">
-        <div class="bill-block">
-          <h4>${L.lbl_company}</h4>
-          <div class="v">${esc(co.name || '')}</div>
-          <div class="s">${co.address ? esc(co.address) + '<br>' : ''}${co.phone ? 'T: ' + esc(co.phone) + '<br>' : ''}${co.email ? esc(co.email) : ''}</div>
-        </div>
-        <div class="bill-block">
-          <h4>${L.lbl_bill_to}</h4>
-          <div class="v">${esc(inv.customer.name || '')}</div>
-          <div class="s">${inv.customer.phone ? 'T: ' + esc(inv.customer.phone) + '<br>' : ''}${inv.customer.address ? esc(inv.customer.address) : ''}</div>
-        </div>
-      </div>
-      <table class="items">
-        <thead>
-          <tr>
-            <th style="width:52%">${L.th_description}</th>
-            <th style="width:10%;text-align:center">${L.th_qty}</th>
-            <th style="width:16%;text-align:right">${L.th_unit_price}</th>
-            <th style="width:18%;text-align:right">${L.th_amount}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${doorRows}${otherRows}
-        </tbody>
-      </table>
-      <div class="totals">
-        <div class="totals-box">
-          <div class="row"><span class="lbl">${L.sub_total} ${inv.lang === 'nl' ? '(excl. BTW)' : '（不含税）'}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
-          ${discountUSD > 0 ? `<div class="row"><span class="lbl">${L.discount}</span><span>-${fmtCur(discountUSD, 'SRD')}</span></div>` : ''}
-          <div class="row btw-row"><span class="lbl">${vatLabel}</span><span>${fmtCur(btwAmount, 'SRD')}</span></div>
-          <div class="row grand"><span class="lbl">${L.grand_total} ${inv.lang === 'nl' ? '(incl. BTW)' : '（含税）'}</span><span>${fmtCur(totalIncl, 'SRD')}</span></div>
-          <div class="row btw-note">${vatNote}</div>
-        </div>
-        <div class="stamp-wrap">
-          <div class="stamp">
-            <svg viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet">
-              <rect x="2" y="2" width="296" height="76" rx="6" fill="none" stroke="#c8102e" stroke-width="3"/>
-              <rect x="7" y="7" width="286" height="66" rx="4" fill="none" stroke="#c8102e" stroke-width="1"/>
-              <text x="150" y="52" text-anchor="middle" fill="#c8102e" font-size="28" font-weight="bold" font-family="'Arial Black', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif" textLength="268" lengthAdjust="spacingAndGlyphs">PANDA ALUMINIUM PRODUCTS</text>
-            </svg>
-          </div>
-        </div>
-      </div>
-      ${inv.notes ? `<div class="notes-block"><b>${L.notes_label}: </b>${esc(inv.notes)}</div>` : ''}
-      <div class="terms">
-        <b>${L.terms_title}:</b> ${payTerm}<br>
-        ${L.term_quote_valid}
-      </div>
-      <div class="conds">
-        <b>${inv.lang === 'nl' ? 'Voorwaarden (samenvatting)' : '购买条款摘要'}</b>
-        <ol>
-          ${(inv.lang === 'nl' ? TERMS_NL : TERMS_ZH).map(it => '<li>' + esc(it) + '</li>').join('')}
-        </ol>
-        <div class="conds-bank">
-          <b>${inv.lang === 'nl' ? 'Rekeninghouder' : '账户名'}:</b> ${esc(co.bank_holder || 'WANGCHUNFU')}<br>
-          <b>${inv.lang === 'nl' ? 'Bank' : '银行'}:</b> ${esc(co.bank || 'Hakrinbank · SRD 200070251 / USD 206861082')}<br>
-          <i>${inv.lang === 'nl' ? 'Geen contante betaling of betaling aan privérekeningen.' : '不接受现金付款或个人账户付款。'}</i>
-        </div>
-      </div>
+    <!-- 页码 -->
+    <div class="cn-page">第1/1页</div>
+
+    <!-- 信息区（右侧） -->
+    <div class="cn-info">
+      <div class="cn-info-row"><span class="cn-lbl">${isZh ? '日期' : 'Datum'}:</span> <span>${esc(inv.date || '')}</span></div>
+      <div class="cn-info-row"><span class="cn-lbl">${isZh ? '订货商' : 'Klant'}:</span> <span><b>${esc(inv.customer.name || '')}</b></span></div>
+      <div class="cn-info-row"><span class="cn-lbl">${isZh ? '单据编号' : 'Bon nr'}:</span> <span>${esc(inv.number)}</span></div>
+      ${inv.notes ? `<div class="cn-info-row"><span class="cn-lbl">${isZh ? '备注' : 'Opmerking'}:</span> <span>${esc(inv.notes)}</span></div>` : ''}
     </div>
-    <div class="sheet-foot">
-      <div>
-        <div class="thank">${L.thank_you}</div>
-        <div>${L.foot_note}</div>
-      </div>
+
+    <!-- 明细表格 -->
+    <table class="cn-table">
+      <thead>
+        <tr>
+          <th style="width:6%">${isZh ? '行$' : '#'}</th>
+          <th style="width:30%">${isZh ? '商品名称(Description)' : 'Product (Omschrijving)'}</th>
+          <th style="width:12%">${isZh ? '单位(unit)' : 'Eenheid'}</th>
+          <th style="width:10%">${isZh ? '数量(num)' : 'Aantal'}</th>
+          <th style="width:16%">${isZh ? '单价(Unit price)' : 'Prijs'}</th>
+          <th style="width:16%">${isZh ? '金额(Amount)' : 'Bedrag'}</th>
+          <th style="width:10%">${isZh ? '单据备注' : 'Nota'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${doorRows}${otherRows}
+      </tbody>
+      <tfoot>
+        <tr class="cn-total-row">
+          <td colspan="3"><b>${isZh ? '合计金额:' : 'Totaal:'}</b></td>
+          <td style="text-align:center"><b>${totalQty}</b></td>
+          <td></td>
+          <td style="text-align:right"><b>${fmtCur(totalIncl, 'SRD')}</b></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- 底部信息 -->
+    <div class="cn-foot">
+      <div><span class="cn-lbl">${isZh ? '电话(Tel)' : 'Tel'}:</span> ${esc(co.phone || '')}</div>
+      <div><span class="cn-lbl">${isZh ? '打印日期(Print Date)' : 'Print Datum'}:</span> ${printDate}</div>
+    </div>
+
+    <!-- 税额说明（小字） -->
+    <div class="cn-vat-note">
+      ${isZh ? ('不含税 ' + fmtCur(totalUSD, 'SRD') + ' + 增值税 ' + vatPct + '% ' + fmtCur(btwAmount, 'SRD') + ' = 含税 ' + fmtCur(totalIncl, 'SRD'))
+        : ('Excl. BTW ' + fmtCur(totalUSD, 'SRD') + ' + BTW ' + vatPct + '% ' + fmtCur(btwAmount, 'SRD') + ' = Incl. ' + fmtCur(totalIncl, 'SRD'))}
     </div>
   </div>`;
 }
