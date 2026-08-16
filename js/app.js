@@ -1558,6 +1558,14 @@ function fmtCur(v, cur) {
   return sym + v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 function printInvoice(inv) {
+  // 在嵌入预览/iframe 中 window.print 会被浏览器拦截，提示用户到浏览器新标签打印
+  try {
+    if (window.self !== window.top) {
+      toast('预览窗口不能打印，已帮你打开浏览器新标签 → 在那里点打印');
+      const url = location.href.split('#')[0];
+      if (window.open(url, '_blank')) return;
+    }
+  } catch (e) { /* 跨域 iframe 无法判断，继续 */ }
   $('print-area').innerHTML = buildPrintHTML(inv, false);
   setTimeout(() => { window.print(); }, 60);
 }
