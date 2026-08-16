@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panda.com — Factuur / 发票系统</title>
-<link rel="stylesheet" href="css/style.css?v=27">
+<link rel="stylesheet" href="css/style.css?v=28">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F97316'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>P</text></svg>">
 </head>
 <body>
@@ -491,6 +491,7 @@
       <div class="head-actions" style="gap:8px">
         <button class="btn btn-small btn-wa" onclick="shareViewWhatsApp()" data-i18n="btn_share_wa">WhatsApp</button>
         <button class="btn btn-small btn-mail" onclick="shareViewEmail()" data-i18n="btn_share_email">Email</button>
+        <button class="btn btn-small btn-img" onclick="saveViewPng()" data-i18n="btn_save_png">保存图片</button>
         <button class="btn btn-small btn-print" onclick="printViewInvoice()" data-i18n="btn_print">打印 / PDF</button>
         <button class="modal-close" data-close="modal-view">×</button>
       </div>
@@ -502,7 +503,8 @@
 <!-- ============ 发票预览/打印 ============ -->
 <div id="print-area"></div>
 
-<script src="js/i18n.js?v=27"></script>
-<script src="js/app.js?v=27"></script>
+<script src="js/i18n.js?v=28"></script>
+<script src="js/app.js?v=28"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </body>
 </html>

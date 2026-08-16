@@ -3,7 +3,7 @@
 
 /* ---------- 存储 ---------- */
 const LS_KEY = 'panda_invoice_data_v1';
-const DATA_VERSION = 19; // 数据结构版本（v11：1-7月真实发票 162 笔，各月总额精确匹配，修门金额有零有整）
+const DATA_VERSION = 20; // 数据结构版本（v20：KVK 更正为 94918；发票保存图片功能）
 let DB = { invoices: [], customers: [], settings: {}, nextNo: 1 };
 
 const DEFAULT_SETTINGS = {
@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
     email: 'info@pandarolluiken.com',
     web: 'pandarolluiken.com',
     tax: '1000030601',
-    kvk: '94318',
+    kvk: '94918',
     bank: 'Hakrinbank · SRD 200070251 / USD 206861082',
     bank_holder: 'WANGCHUNFU'
   },
@@ -1633,6 +1633,34 @@ function renderViewInvoice() {
 function printViewInvoice() {
   if (!viewingInvoice) return;
   printInvoice(Object.assign({}, viewingInvoice, { lang: viewingLang }));
+}
+
+/* ---------- 发票保存为图片（PNG） ---------- */
+function saveViewPng() {
+  if (!viewingInvoice) return;
+  const body = $('view-body');
+  const sheet = body ? body.querySelector('.sheet') : null;
+  if (!sheet) { toast('NO_SHEET'); return; }
+  if (typeof html2canvas === 'undefined') {
+    toast(currentLang === 'nl' ? 'Afbeelding module laden...' : '图片组件加载中，请重试');
+    return;
+  }
+  const fileName = 'INVOICE_' + (viewingInvoice.number || 'invoice') + '.png';
+  html2canvas(sheet, {
+    scale: 2,                // 2 倍高清
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false
+  }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = fileName;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast(currentLang === 'nl' ? 'Afbeelding opgeslagen' : '图片已保存');
+  }).catch(err => {
+    console.error('html2canvas error:', err);
+    toast(currentLang === 'nl' ? 'Opslaan mislukt' : '保存失败，请重试');
+  });
 }
 
 /* ---------- 发票分享（WhatsApp / Email） ---------- */
