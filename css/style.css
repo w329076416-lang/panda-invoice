@@ -375,6 +375,11 @@ textarea { resize: vertical; }
 }
 .sheet .totals-box .row .lbl { color: #555; }
 .sheet .totals-box .row.grand .lbl { color: #111; }
+.sheet .totals-box .row.btw-note {
+  font-size: 9.5px; color: #999; font-style: italic; padding-top: 2px; justify-content: flex-end;
+}
+.sheet .inv-meta b { color: #333; }
+.sheet .inv-meta .fx { color: #b45309; }
 
 .sheet .terms { font-size: 10px; color: #555; border-top: 1px solid #eee; padding-top: 10px; margin-top: 14px; line-height: 1.7; }
 .sheet .terms b { color: #333; }

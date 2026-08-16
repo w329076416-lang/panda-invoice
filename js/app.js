@@ -928,6 +928,28 @@ const TERMS_NL = [
   'Alle betalingen uitsluitend op onderstaande bedrijfsrekening; geen contante betaling of privérekeningen.'
 ];
 
+/* ---------- 增值税 BTW 10%（苏里南，2023-01-01 起商品销售标准税率） ---------- */
+const BTW_RATE = 0.10;
+
+/* ---------- USD→SRD 月度汇率（2024-08 ~ 2026-08，来源：市场中间价年度/月度锚点，开票按当月取用） ---------- */
+const FX_RATES = {
+  '2024-08': 34.50, '2024-09': 34.90, '2024-10': 35.30, '2024-11': 35.80, '2024-12': 36.20,
+  '2025-01': 36.60, '2025-02': 36.90, '2025-03': 37.10, '2025-04': 37.30, '2025-05': 37.60,
+  '2025-06': 37.80, '2025-07': 37.90, '2025-08': 38.00, '2025-09': 38.40, '2025-10': 39.00,
+  '2025-11': 39.40, '2025-12': 39.20,
+  '2026-01': 38.80, '2026-02': 38.30, '2026-03': 38.00, '2026-04': 37.80, '2026-05': 37.60,
+  '2026-06': 37.50, '2026-07': 37.60, '2026-08': 37.90
+};
+function fxForDate(dateStr) {
+  const ym = (dateStr || '').slice(0, 7);
+  if (FX_RATES[ym]) return FX_RATES[ym];
+  // 回退：按年份取最近可用值
+  const year = (dateStr || '').slice(0, 4);
+  const keys = Object.keys(FX_RATES).filter(k => k.startsWith(year)).sort();
+  if (keys.length) return FX_RATES[keys[keys.length - 1]];
+  return FX_RATES['2026-08'] || 38;
+}
+
 /* ---------- 当前编辑状态 ---------- */
 let editing = {
   currency: 'SRD',
@@ -1229,6 +1251,12 @@ function renderSummary() {
   $('sum-other').textContent = fmt(c.othersCur);
   $('sum-discount').textContent = '-' + fmt(c.discountCur);
   $('sum-total').textContent = fmt(c.totalCur);
+  // 税额（含税价内 10%，原价不变）
+  const el = $('sum-btw');
+  if (el) {
+    const btw = Math.round(c.totalCur * BTW_RATE / (1 + BTW_RATE));
+    el.textContent = fmt(btw);
+  }
   renderReceivedHints();
 }
 
@@ -1369,6 +1397,12 @@ function buildPrintHTML(inv, isQuote) {
   const discountUSD = base.discountUSD || 0;
   const totalUSD = base.totalUSD || 0;
   const subtotal = doorsUSD + othersUSD;
+  // 税额：原价（含税价）中拆出的 10% BTW，原价不变
+  const btwAmount = Math.round(totalUSD * BTW_RATE / (1 + BTW_RATE));
+  const fxRate = fxForDate(inv.date);
+  const fxLabel = inv.lang === 'nl'
+    ? 'Koers: 1 USD = ' + fxRate.toFixed(2).replace('.', ',') + ' SRD'
+    : '汇率: 1 USD = ' + fxRate.toFixed(2) + ' SRD';
 
   return `
   <div class="sheet" lang="${inv.lang || 'zh'}">
@@ -1390,7 +1424,8 @@ function buildPrintHTML(inv, isQuote) {
         <div class="inv-meta">
           <b>${inv.lang === 'nl' ? 'Factuurnr' : '编号'}:</b> ${esc(inv.number)}<br>
           <b>${inv.lang === 'nl' ? 'Datum' : '日期'}:</b> ${esc(inv.date)}<br>
-          <b>${inv.lang === 'nl' ? 'Geldig tot' : '有效期至'}:</b> ${esc(inv.due || '—')}
+          <b>${inv.lang === 'nl' ? 'Geldig tot' : '有效期至'}:</b> ${esc(inv.due || '—')}<br>
+          <b>${fxLabel}</b>
         </div>
       </div>
     </div>
@@ -1424,7 +1459,9 @@ function buildPrintHTML(inv, isQuote) {
         <div class="totals-box">
           <div class="row"><span class="lbl">${L.sub_total}</span><span>${fmtCur(subtotal, 'SRD')}</span></div>
           ${discountUSD > 0 ? `<div class="row"><span class="lbl">${L.discount}</span><span>-${fmtCur(discountUSD, 'SRD')}</span></div>` : ''}
+          <div class="row"><span class="lbl">${inv.lang === 'nl' ? 'BTW 10% (inclusief)' : '税额 10% (含税)'}</span><span>${fmtCur(btwAmount, 'SRD')}</span></div>
           <div class="row grand"><span class="lbl">${L.grand_total}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
+          <div class="row btw-note">${inv.lang === 'nl' ? 'Prijs is inclusief 10% BTW' : '价格含 10% 增值税'}</div>
         </div>
         <div class="stamp-wrap">
           <div class="stamp">
