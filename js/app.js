@@ -928,8 +928,25 @@ const TERMS_NL = [
   'Alle betalingen uitsluitend op onderstaande bedrijfsrekening; geen contante betaling of privérekeningen.'
 ];
 
-/* ---------- 增值税 BTW 10%（苏里南，2023-01-01 起商品销售标准税率） ---------- */
+/* ---------- 增值税 BTW（苏里南：商品销售标准税率 10%，2023-01-01 起生效；历史按年月取） ---------- */
 const BTW_RATE = 0.10;
+// 历史税率表：'YYYY-MM' → 税率（苏里南 2023-01 起商品销售一直 10%，2024-08~2026-08 均为 10%）
+const VAT_RATES = {
+  '2024-08': 0.10, '2024-09': 0.10, '2024-10': 0.10, '2024-11': 0.10, '2024-12': 0.10,
+  '2025-01': 0.10, '2025-02': 0.10, '2025-03': 0.10, '2025-04': 0.10, '2025-05': 0.10,
+  '2025-06': 0.10, '2025-07': 0.10, '2025-08': 0.10, '2025-09': 0.10, '2025-10': 0.10,
+  '2025-11': 0.10, '2025-12': 0.10,
+  '2026-01': 0.10, '2026-02': 0.10, '2026-03': 0.10, '2026-04': 0.10, '2026-05': 0.10,
+  '2026-06': 0.10, '2026-07': 0.10, '2026-08': 0.10
+};
+function vatForDate(dateStr) {
+  const ym = (dateStr || '').slice(0, 7);
+  if (VAT_RATES[ym] !== undefined) return VAT_RATES[ym];
+  const year = (dateStr || '').slice(0, 4);
+  const keys = Object.keys(VAT_RATES).filter(k => k.startsWith(year)).sort();
+  if (keys.length) return VAT_RATES[keys[keys.length - 1]];
+  return BTW_RATE;
+}
 
 /* ---------- USD→SRD 月度汇率（2024-08 ~ 2026-08，来源：市场中间价年度/月度锚点，开票按当月取用） ---------- */
 const FX_RATES = {
@@ -1251,10 +1268,11 @@ function renderSummary() {
   $('sum-other').textContent = fmt(c.othersCur);
   $('sum-discount').textContent = '-' + fmt(c.discountCur);
   $('sum-total').textContent = fmt(c.totalCur);
-  // 税额（含税价内 10%，原价不变）
+  // 税额（含税价内按当月税率，原价不变）
   const el = $('sum-btw');
   if (el) {
-    const btw = Math.round(c.totalCur * BTW_RATE / (1 + BTW_RATE));
+    const rate = vatForDate($('inv-date').value || todayStr());
+    const btw = Math.round(c.totalCur * rate / (1 + rate));
     el.textContent = fmt(btw);
   }
   renderReceivedHints();
@@ -1397,12 +1415,21 @@ function buildPrintHTML(inv, isQuote) {
   const discountUSD = base.discountUSD || 0;
   const totalUSD = base.totalUSD || 0;
   const subtotal = doorsUSD + othersUSD;
-  // 税额：原价（含税价）中拆出的 10% BTW，原价不变
-  const btwAmount = Math.round(totalUSD * BTW_RATE / (1 + BTW_RATE));
+  // 增值税：按开票当月税率，从含税价内拆出税额；原价（含税总价）不变
+  const vatRate = vatForDate(inv.date);
+  const vatPct = Math.round(vatRate * 100);
+  const btwAmount = Math.round(totalUSD * vatRate / (1 + vatRate));
+  const netAmount = totalUSD - btwAmount;
   const fxRate = fxForDate(inv.date);
   const fxLabel = inv.lang === 'nl'
     ? 'Koers: 1 USD = ' + fxRate.toFixed(2).replace('.', ',') + ' SRD'
     : '汇率: 1 USD = ' + fxRate.toFixed(2) + ' SRD';
+  const vatLabel = inv.lang === 'nl'
+    ? 'BTW ' + vatPct + '% (inclusief)'
+    : '增值税 BTW ' + vatPct + '%（含税价内）';
+  const vatNote = inv.lang === 'nl'
+    ? 'Prijs is inclusief ' + vatPct + '% BTW'
+    : '价格含 ' + vatPct + '% 增值税';
 
   return `
   <div class="sheet" lang="${inv.lang || 'zh'}">
@@ -1425,6 +1452,7 @@ function buildPrintHTML(inv, isQuote) {
           <b>${inv.lang === 'nl' ? 'Factuurnr' : '编号'}:</b> ${esc(inv.number)}<br>
           <b>${inv.lang === 'nl' ? 'Datum' : '日期'}:</b> ${esc(inv.date)}<br>
           <b>${inv.lang === 'nl' ? 'Geldig tot' : '有效期至'}:</b> ${esc(inv.due || '—')}<br>
+          <b>${inv.lang === 'nl' ? 'BTW-tarief' : '税率'}: ${vatPct}%</b><br>
           <b>${fxLabel}</b>
         </div>
       </div>
@@ -1459,9 +1487,10 @@ function buildPrintHTML(inv, isQuote) {
         <div class="totals-box">
           <div class="row"><span class="lbl">${L.sub_total}</span><span>${fmtCur(subtotal, 'SRD')}</span></div>
           ${discountUSD > 0 ? `<div class="row"><span class="lbl">${L.discount}</span><span>-${fmtCur(discountUSD, 'SRD')}</span></div>` : ''}
-          <div class="row"><span class="lbl">${inv.lang === 'nl' ? 'BTW 10% (inclusief)' : '税额 10% (含税)'}</span><span>${fmtCur(btwAmount, 'SRD')}</span></div>
-          <div class="row grand"><span class="lbl">${L.grand_total}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
-          <div class="row btw-note">${inv.lang === 'nl' ? 'Prijs is inclusief 10% BTW' : '价格含 10% 增值税'}</div>
+          <div class="row btw-row"><span class="lbl">${vatLabel}</span><span>${fmtCur(btwAmount, 'SRD')}</span></div>
+          <div class="row"><span class="lbl">${inv.lang === 'nl' ? 'Bedrag excl. BTW' : '净额（不含税）'}</span><span>${fmtCur(netAmount, 'SRD')}</span></div>
+          <div class="row grand"><span class="lbl">${L.grand_total} ${inv.lang === 'nl' ? '(incl. BTW)' : '（含税）'}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
+          <div class="row btw-note">${vatNote}</div>
         </div>
         <div class="stamp-wrap">
           <div class="stamp">

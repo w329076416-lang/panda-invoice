@@ -375,6 +375,10 @@ textarea { resize: vertical; }
 }
 .sheet .totals-box .row .lbl { color: #555; }
 .sheet .totals-box .row.grand .lbl { color: #111; }
+.sheet .totals-box .row.btw-row {
+  color: #b45309; font-weight: 700;
+}
+.sheet .totals-box .row.btw-row .lbl { color: #b45309; }
 .sheet .totals-box .row.btw-note {
   font-size: 9.5px; color: #999; font-style: italic; padding-top: 2px; justify-content: flex-end;
 }
