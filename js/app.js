@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   nextNo: 1,
   installPct: 5,
   installMin: 40,
+  vatRate: 10,          // 增值税税率 %（苏里南商品销售 10%，可在设置中修改）
   lang: 'nl'
 };
 
@@ -1092,13 +1093,15 @@ function renderStats() {
     return true;
   });
   let total = 0, deposit = 0, balance = 0;
+  const vatRate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
   list.forEach(inv => {
-    const t = inv.totals.totalUSD || 0;
-    total += t;
+    const t = inv.totals.totalUSD || 0;                 // 不含税
+    const incl = t + Math.round(t * vatRate);           // 含税 = 不含税 + 税额
+    total += incl;
     const p = inv.payment;
-    if (p === '100') deposit += t;          // 全款预付 → 全算定金
-    else if (p === '0/100') balance += t;   // 安装后付清 → 全算尾款
-    else { deposit += t * 0.5; balance += t * 0.5; } // 50/50
+    if (p === '100') deposit += incl;          // 全款预付 → 全算定金
+    else if (p === '0/100') balance += incl;   // 安装后付清 → 全算尾款
+    else { deposit += incl * 0.5; balance += incl * 0.5; } // 50/50
   });
   $('stat-total').textContent = fmtRaw(Math.round(total), 'SRD') + ' SRD';
   $('stat-deposit').textContent = fmtRaw(Math.round(deposit), 'SRD') + ' SRD';
@@ -1268,11 +1271,11 @@ function renderSummary() {
   $('sum-other').textContent = fmt(c.othersCur);
   $('sum-discount').textContent = '-' + fmt(c.discountCur);
   $('sum-total').textContent = fmt(c.totalCur);
-  // 税额（含税价内按当月税率，原价不变）
+  // 税额：不含税金额 × 税率（税率取设置，默认 10%），总金额 = 不含税 + 税额
   const el = $('sum-btw');
   if (el) {
-    const rate = vatForDate($('inv-date').value || todayStr());
-    const btw = Math.round(c.totalCur * rate / (1 + rate));
+    const rate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
+    const btw = Math.round(c.totalCur * rate);
     el.textContent = fmt(btw);
   }
   renderReceivedHints();
@@ -1413,23 +1416,23 @@ function buildPrintHTML(inv, isQuote) {
   const doorsUSD = base.doorsUSD || 0;
   const othersUSD = base.othersUSD || 0;
   const discountUSD = base.discountUSD || 0;
-  const totalUSD = base.totalUSD || 0;
+  const totalUSD = base.totalUSD || 0;   // 不含税金额（明细合计）
   const subtotal = doorsUSD + othersUSD;
-  // 增值税：按开票当月税率，从含税价内拆出税额；原价（含税总价）不变
-  const vatRate = vatForDate(inv.date);
+  // 增值税：税率取设置值（默认 10%，可在设置修改）；税额 = 不含税金额 × 税率；总金额 = 不含税 + 税额
+  const vatRate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
   const vatPct = Math.round(vatRate * 100);
-  const btwAmount = Math.round(totalUSD * vatRate / (1 + vatRate));
-  const netAmount = totalUSD - btwAmount;
+  const btwAmount = Math.round(totalUSD * vatRate);
+  const totalIncl = totalUSD + btwAmount;   // 含税总金额 = 发票总金额
   const fxRate = fxForDate(inv.date);
   const fxLabel = inv.lang === 'nl'
     ? 'Koers: 1 USD = ' + fxRate.toFixed(2).replace('.', ',') + ' SRD'
     : '汇率: 1 USD = ' + fxRate.toFixed(2) + ' SRD';
   const vatLabel = inv.lang === 'nl'
-    ? 'BTW ' + vatPct + '% (inclusief)'
-    : '增值税 BTW ' + vatPct + '%（含税价内）';
+    ? 'BTW ' + vatPct + '%'
+    : '增值税 BTW ' + vatPct + '%';
   const vatNote = inv.lang === 'nl'
-    ? 'Prijs is inclusief ' + vatPct + '% BTW'
-    : '价格含 ' + vatPct + '% 增值税';
+    ? 'Totaal = excl. BTW + ' + vatPct + '% BTW'
+    : '总金额 = 不含税 + ' + vatPct + '% 增值税';
 
   return `
   <div class="sheet" lang="${inv.lang || 'zh'}">
@@ -1452,8 +1455,7 @@ function buildPrintHTML(inv, isQuote) {
           <b>${inv.lang === 'nl' ? 'Factuurnr' : '编号'}:</b> ${esc(inv.number)}<br>
           <b>${inv.lang === 'nl' ? 'Datum' : '日期'}:</b> ${esc(inv.date)}<br>
           <b>${inv.lang === 'nl' ? 'Geldig tot' : '有效期至'}:</b> ${esc(inv.due || '—')}<br>
-          <b>${inv.lang === 'nl' ? 'BTW-tarief' : '税率'}: ${vatPct}%</b><br>
-          <b>${fxLabel}</b>
+          <b>${inv.lang === 'nl' ? 'BTW-tarief' : '税率'}: ${vatPct}%</b><br>          <b>${fxLabel}</b>
         </div>
       </div>
     </div>
@@ -1485,11 +1487,10 @@ function buildPrintHTML(inv, isQuote) {
       </table>
       <div class="totals">
         <div class="totals-box">
-          <div class="row"><span class="lbl">${L.sub_total}</span><span>${fmtCur(subtotal, 'SRD')}</span></div>
+          <div class="row"><span class="lbl">${L.sub_total} ${inv.lang === 'nl' ? '(excl. BTW)' : '（不含税）'}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
           ${discountUSD > 0 ? `<div class="row"><span class="lbl">${L.discount}</span><span>-${fmtCur(discountUSD, 'SRD')}</span></div>` : ''}
           <div class="row btw-row"><span class="lbl">${vatLabel}</span><span>${fmtCur(btwAmount, 'SRD')}</span></div>
-          <div class="row"><span class="lbl">${inv.lang === 'nl' ? 'Bedrag excl. BTW' : '净额（不含税）'}</span><span>${fmtCur(netAmount, 'SRD')}</span></div>
-          <div class="row grand"><span class="lbl">${L.grand_total} ${inv.lang === 'nl' ? '(incl. BTW)' : '（含税）'}</span><span>${fmtCur(totalUSD, 'SRD')}</span></div>
+          <div class="row grand"><span class="lbl">${L.grand_total} ${inv.lang === 'nl' ? '(incl. BTW)' : '（含税）'}</span><span>${fmtCur(totalIncl, 'SRD')}</span></div>
           <div class="row btw-note">${vatNote}</div>
         </div>
         <div class="stamp-wrap">
@@ -1582,8 +1583,10 @@ function renderRecords() {
     );
   }
   $('record-empty').style.display = list.length ? 'none' : 'block';
+  const vatRateList = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
   body.innerHTML = list.map(inv => {
-    const grand = inv.totals.totalCur !== undefined ? inv.totals.totalCur : (inv.totals.totalUSD || 0);
+    const baseAmt = inv.totals.totalCur !== undefined ? inv.totals.totalCur : (inv.totals.totalUSD || 0);
+    const grand = baseAmt + Math.round(baseAmt * vatRateList);   // 含税总金额 = 不含税 + 税额
     return `
     <tr>
       <td class="mono">${esc(inv.number)}</td>
@@ -1655,9 +1658,14 @@ function buildShareText(inv) {
     lines.push(n + '\t' + fmtRaw(Math.round(o.price), cur) + ' ' + cur);
   });
   lines.push('');
-  // 合计
+  // 合计（不含税 + 税额 = 含税总金额）
   const total = inv.totals.totalUSD || 0;
-  lines.push((viewingLang === 'nl' ? 'Totaal' : '合计') + ': ' + fmtRaw(Math.round(total), cur) + ' ' + cur);
+  const rate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
+  const btw = Math.round(total * rate);
+  const incl = total + btw;
+  lines.push((viewingLang === 'nl' ? 'Subtotaal (excl. BTW)' : '小计（不含税）') + ': ' + fmtRaw(Math.round(total), cur) + ' ' + cur);
+  lines.push((viewingLang === 'nl' ? 'BTW ' : '增值税 ') + Math.round(rate * 100) + '%: ' + fmtRaw(btw, cur) + ' ' + cur);
+  lines.push((viewingLang === 'nl' ? 'Totaal (incl. BTW)' : '合计（含税）') + ': ' + fmtRaw(Math.round(incl), cur) + ' ' + cur);
   // 付款条款
   const payTxt = inv.payment === '100' ? (viewingLang === 'nl' ? 'Vooruitbetaling' : '全款预付')
     : inv.payment === '0/100' ? (viewingLang === 'nl' ? 'Na installatie' : '安装后付清')
@@ -1935,6 +1943,7 @@ function loadSettingsForm() {
   $('set-company-bank-holder').value = co.bank_holder || '';
   $('set-inv-prefix').value = s.invPrefix;
   $('set-inv-next').value = s.nextNo;
+  if ($('set-vat-rate')) $('set-vat-rate').value = s.vatRate != null ? s.vatRate : 10;
   if ($('set-lang')) $('set-lang').value = currentLang || s.lang || 'nl';
 }
 function saveSettingsForm() {
@@ -1955,6 +1964,7 @@ function saveSettingsForm() {
     },
     invPrefix: $('set-inv-prefix').value.trim(),
     nextNo: parseInt($('set-inv-next').value) || 1,
+    vatRate: parseFloat($('set-vat-rate').value) >= 0 ? parseFloat($('set-vat-rate').value) : 10,
     lang: newLang
   });
   setLang(newLang);  // 立即切换界面语言
