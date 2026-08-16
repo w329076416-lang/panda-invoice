@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panda.com — Factuur / 发票系统</title>
-<link rel="stylesheet" href="css/style.css?v=26">
+<link rel="stylesheet" href="css/style.css?v=27">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F97316'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>P</text></svg>">
 </head>
 <body>
@@ -244,6 +244,14 @@
           <div class="stat-box">
             <div class="stat-num" id="stat-total">0</div>
             <div class="stat-label" data-i18n="stat_total">发票总金额</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="stat-excl">0</div>
+            <div class="stat-label" data-i18n="stat_excl">不含税金额</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num accent" id="stat-btw">0</div>
+            <div class="stat-label" data-i18n="stat_btw">税额</div>
           </div>
           <div class="stat-box">
             <div class="stat-num accent" id="stat-deposit">0</div>
@@ -494,7 +502,7 @@
 <!-- ============ 发票预览/打印 ============ -->
 <div id="print-area"></div>
 
-<script src="js/i18n.js?v=26"></script>
-<script src="js/app.js?v=26"></script>
+<script src="js/i18n.js?v=27"></script>
+<script src="js/app.js?v=27"></script>
 </body>
 </html>

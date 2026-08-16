@@ -1092,18 +1092,23 @@ function renderStats() {
     if (month !== 'all' && parseInt(d.split('-')[1], 10) !== parseInt(month, 10)) return false;
     return true;
   });
-  let total = 0, deposit = 0, balance = 0;
+  let total = 0, deposit = 0, balance = 0, exclTotal = 0, btwTotal = 0;
   const vatRate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
   list.forEach(inv => {
     const t = inv.totals.totalUSD || 0;                 // 不含税
-    const incl = t + Math.round(t * vatRate);           // 含税 = 不含税 + 税额
+    const btw = Math.round(t * vatRate);                // 税额
+    const incl = t + btw;                               // 含税 = 不含税 + 税额
     total += incl;
+    exclTotal += t;
+    btwTotal += btw;
     const p = inv.payment;
     if (p === '100') deposit += incl;          // 全款预付 → 全算定金
     else if (p === '0/100') balance += incl;   // 安装后付清 → 全算尾款
     else { deposit += incl * 0.5; balance += incl * 0.5; } // 50/50
   });
   $('stat-total').textContent = fmtRaw(Math.round(total), 'SRD') + ' SRD';
+  $('stat-excl').textContent = fmtRaw(Math.round(exclTotal), 'SRD') + ' SRD';
+  $('stat-btw').textContent = fmtRaw(Math.round(btwTotal), 'SRD') + ' SRD';
   $('stat-deposit').textContent = fmtRaw(Math.round(deposit), 'SRD') + ' SRD';
   $('stat-balance').textContent = fmtRaw(Math.round(balance), 'SRD') + ' SRD';
   $('stat-count').textContent = list.length + (currentLang === 'nl' ? ' stuks' : ' 张');
