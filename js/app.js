@@ -3,7 +3,7 @@
 
 /* ---------- 存储 ---------- */
 const LS_KEY = 'panda_invoice_data_v1';
-const DATA_VERSION = 20; // 数据结构版本（v20：KVK 更正为 94918；发票保存图片功能）
+const DATA_VERSION = 20; // 数据结构版本（v20：KKF 更正为 94918；发票保存图片功能）
 let DB = { invoices: [], customers: [], settings: {}, nextNo: 1 };
 
 const DEFAULT_SETTINGS = {
@@ -1450,7 +1450,7 @@ function buildPrintHTML(inv, isQuote) {
           ${co.phone ? 'T: ' + esc(co.phone) + (co.web ? '  |  W: ' + esc(co.web) : '') : esc(co.web || '')}
           ${co.email ? '<br>E: ' + esc(co.email) : ''}
           ${co.tax ? '<br>' + (inv.lang === 'nl' ? 'BTW' : '税号') + ': ' + esc(co.tax) : ''}
-          ${co.kvk ? '<br>KVK: ' + esc(co.kvk) : ''}
+          ${co.kvk ? '<br>KKF: ' + esc(co.kvk) : ''}
         </div>
       </div>
       <div class="inv-title-box">
