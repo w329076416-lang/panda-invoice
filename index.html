@@ -421,11 +421,13 @@
       <div class="card">
         <div class="card-head"><span class="card-title" data-i18n="sec_data">数据管理</span></div>
         <div class="btn-row">
+          <button class="btn btn-primary" id="btn-export-xlsx" data-i18n="btn_export_xlsx">⬇ 导出 Excel 明细表（总表 + 每月）</button>
           <button class="btn btn-ghost" id="btn-export" data-i18n="btn_export">导出备份 (JSON)</button>
           <button class="btn btn-ghost" id="btn-import" data-i18n="btn_import">导入数据</button>
           <input type="file" id="import-file" accept=".json" hidden>
         </div>
         <p class="hint" data-i18n="hint_data">数据保存在本浏览器中。建议定期导出备份。</p>
+        <p class="hint" data-i18n="hint_xlsx">Excel 含：全部明细（每月客户 / 姓名 / 已收金额 / 产品明细）+ 月度汇总 + 客户汇总 + 每个月单独一张表。</p>
       </div>
 
       <div class="action-bar">
@@ -503,8 +505,9 @@
 <!-- ============ 发票预览/打印 ============ -->
 <div id="print-area"></div>
 
-<script src="js/i18n.js?v=31"></script>
-<script src="js/app.js?v=31"></script>
+<script src="js/lib/xlsx.full.min.js?v=1"></script>
+<script src="js/i18n.js?v=32"></script>
+<script src="js/app.js?v=32"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </body>
 </html>

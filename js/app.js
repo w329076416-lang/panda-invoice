@@ -2012,6 +2012,128 @@ function saveSettingsForm() {
   toast(t('toast_settings'));
 }
 
+/* ================= Excel 明细表导出（总表 + 月度汇总 + 客户汇总 + 每月一张表） =================
+   依赖本地 js/lib/xlsx.full.min.js（SheetJS，不联网也能用） */
+const XL_HEAD = ['月份', '发票号', '开票日期', '到期日', '客户姓名', '电话', '地址', '产品明细',
+  '不含税 (SRD)', 'BTW 10% (SRD)', '含税合计 (SRD)', '折算 USD',
+  '已收定金 (SRD)', '已收尾款 (SRD)', '已收合计 (SRD)', '未收 (SRD)',
+  '付款条款', '状态', '备注'];
+
+// 门型 / 门色 中文名（导出固定中文，不跟界面语言）
+function xlDoorName(id, list) {
+  const ZH = (typeof I18N !== 'undefined' && I18N.zh) ? I18N.zh : {};
+  const f = (list || []).find(x => x.id === id);
+  return f && ZH[f.key] ? ZH[f.key] : (id || '');
+}
+// 一行里的「产品明细」文本
+function xlItems(inv) {
+  const parts = [];
+  (inv.doors || []).forEach(d => {
+    const nm = xlDoorName(d.type, DOOR_TYPES) + ' / ' + xlDoorName(d.color, DOOR_COLORS);
+    const q = parseInt(d.qty) || 1;
+    const p = parseFloat(d.price) || 0;
+    parts.push(nm + ' ×' + q + (q > 1 ? '（单价 ' + p + '）' : '') + ' = ' + (p * q));
+  });
+  (inv.others || []).forEach(o => {
+    const nm = (o.name_zh || '') + (o.name_nl ? ' / ' + o.name_nl : '');
+    parts.push(nm + ' = ' + (parseFloat(o.price) || 0));
+  });
+  return parts.length ? parts.join('; ') : '—';
+}
+// 单张发票的金额口径（与发票打印 / 月度统计完全一致）
+function xlAmounts(inv) {
+  const rate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
+  const excl = +(inv.totals && inv.totals.totalUSD ? inv.totals.totalUSD : 0);
+  const btw = Math.round(excl * rate);
+  const incl = excl + btw;
+  const fx = fxForDate(inv.date) || 38;
+  const rc = inv.received || {};
+  const dep = +(rc.deposit || 0);
+  const bal = +(rc.balance || 0);
+  return { excl, btw, incl, fx, usd: Math.round(incl / fx * 100) / 100, dep, bal, got: dep + bal, left: Math.max(0, incl - dep - bal) };
+}
+function xlRow(inv) {
+  const a = xlAmounts(inv);
+  const cu = inv.customer || {};
+  return [(inv.date || '').slice(0, 7), inv.number || '', inv.date || '', inv.due || '',
+    cu.name || '', cu.phone || '', cu.address || '', xlItems(inv),
+    a.excl, a.btw, a.incl, a.usd, a.dep, a.bal, a.got, a.left,
+    inv.payment || '', inv.status === 'saved' ? '已保存' : (inv.status || ''), inv.notes || ''];
+}
+function xlNumCols(rows) {   // 数字列（从 0 起：8..15）
+  const set = {};
+  rows.forEach((r, ri) => { for (let c = 8; c <= 15; c++) if (typeof r[c] === 'number') set[c] = true; });
+  return set;
+}
+function xlSheet(head, rows) {
+  const aoa = [head].concat(rows);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const widths = [9, 20, 12, 12, 18, 16, 30, 46, 14, 14, 15, 12, 14, 14, 14, 13, 11, 10, 22];
+  ws['!cols'] = head.map((_, i) => ({ wch: widths[i] || 14 }));
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  if (rows.length) {
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: head.length - 1 } }) };
+  }
+  return ws;
+}
+function exportExcel() {
+  if (typeof XLSX === 'undefined') { toast('Excel 组件未加载，请刷新页面后重试'); return; }
+  if (!DB.invoices.length) { toast('还没有发票数据'); return; }
+  const rate = (DB.settings.vatRate != null ? DB.settings.vatRate : 10) / 100;
+
+  /* ---- 全部明细 ---- */
+  const all = DB.invoices.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, xlSheet(XL_HEAD, all.map(xlRow)), '全部明细');
+
+  /* ---- 月度汇总 ---- */
+  const byMonth = {};
+  all.forEach(inv => {
+    const ym = (inv.date || '').slice(0, 7) || '（无日期）';
+    const a = xlAmounts(inv);
+    const m = byMonth[ym] || (byMonth[ym] = { n: 0, excl: 0, btw: 0, incl: 0, dep: 0, bal: 0, got: 0 });
+    m.n++; m.excl += a.excl; m.btw += a.btw; m.incl += a.incl; m.dep += a.dep; m.bal += a.bal; m.got += a.got;
+  });
+  const mRows = Object.keys(byMonth).sort().map(ym => {
+    const m = byMonth[ym];
+    return [ym, m.n, m.excl, m.btw, m.incl, Math.round(m.incl / (fxForDate(ym + '-01') || 38) * 100) / 100, m.dep, m.bal, m.got];
+  });
+  const mTotal = mRows.reduce((a, r) => [a[0], a[1] + r[1], a[2] + r[2], a[3] + r[3], a[4] + r[4], a[5] + r[5], a[6] + r[6], a[7] + r[7], a[8] + r[8]],
+    ['合计', 0, 0, 0, 0, 0, 0, 0, 0]);
+  const mHead = ['月份', '发票张数', '不含税合计 (SRD)', 'BTW 合计 (SRD)', '含税合计 (SRD)', '折算 USD', '已收定金 (SRD)', '已收尾款 (SRD)', '已收合计 (SRD)'];
+  const wsm = xlSheet(mHead, mRows.concat([mTotal]));
+  wsm['!cols'] = mHead.map((_, i) => ({ wch: i === 0 ? 12 : 18 }));
+  XLSX.utils.book_append_sheet(wb, wsm, '月度汇总');
+
+  /* ---- 客户汇总 ---- */
+  const byCust = {};
+  all.forEach(inv => {
+    const cu = inv.customer || {};
+    const key = (cu.name || '（无姓名）') + '|' + (cu.phone || '');
+    const a = xlAmounts(inv);
+    const c = byCust[key] || (byCust[key] = { name: cu.name || '', phone: cu.phone || '', address: cu.address || '', n: 0, incl: 0, got: 0, items: {} });
+    c.n++; c.incl += a.incl; c.got += a.got;
+    (inv.others || []).forEach(o => { const k = o.name_zh || ''; if (k) c.items[k] = (c.items[k] || 0) + 1; });
+    (inv.doors || []).forEach(() => { c.items['门体'] = (c.items['门体'] || 0) + 1; });
+  });
+  const cRows = Object.values(byCust)
+    .sort((a, b) => b.incl - a.incl)
+    .map(c => [c.name, c.phone, c.address, c.n, c.incl, c.got, Math.max(0, c.incl - c.got),
+      Object.keys(c.items).map(k => k + '×' + c.items[k]).join('、')]);
+  const cHead = ['客户姓名', '电话', '地址', '消费次数', '消费总额 (SRD 含税)', '已收合计 (SRD)', '未收 (SRD)', '常购产品'];
+  XLSX.utils.book_append_sheet(wb, xlSheet(cHead, cRows), '客户汇总');
+
+  /* ---- 每个月一张表 ---- */
+  Object.keys(byMonth).sort().forEach(ym => {
+    const rows = all.filter(inv => ((inv.date || '').slice(0, 7) || '（无日期）') === ym).map(xlRow);
+    const name = ym.replace(/[\\\/\?\*\[\]:]/g, '-').slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, xlSheet(XL_HEAD, rows), name);
+  });
+
+  XLSX.writeFile(wb, 'PANDA_发票明细_' + todayStr() + '.xlsx');
+  toast('Excel 已导出');
+}
+
 /* ---------- 数据导入导出 ---------- */
 function exportData() {
   const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
@@ -2205,6 +2327,7 @@ function init() {
   $('modal-customer-search').addEventListener('input', renderCustomerPicker);
   // 设置
   $('btn-save-settings').addEventListener('click', saveSettingsForm);
+  $('btn-export-xlsx').addEventListener('click', exportExcel);
   $('btn-export').addEventListener('click', exportData);
   $('btn-import').addEventListener('click', () => $('import-file').click());
   $('import-file').addEventListener('change', e => {
